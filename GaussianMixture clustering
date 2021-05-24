@@ -1,0 +1,138 @@
+from sklearn.mixture import GaussianMixture
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from collections import Counter
+import matplotlib.patches as mpatches
+import os
+from matplotlib.patches import Ellipse
+import matplotlib as mpl
+from scipy import linalg
+import collections
+
+plt.rcParams.update({'font.size': 10})
+
+csv_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "9_13 Peak(output)(GMM).csv")
+
+df = pd.read_csv("Process 5_9.csv")
+
+X = df.iloc[:, :]
+
+max_col = list(df.max(axis=0))
+
+thresh = 0.5
+nclus = 0
+
+predef_colors = ['violet', 'yellow', 'palegreen', 'deeppink', 'aliceblue', 'antiquewhite', 'aqua', 'aquamarine',
+                 'azure', 'beige', 'bisque', 'black', 'blanchedalmond', 'blue', 'blueviolet', 'brown', 'burlywood',
+                 'cadetblue', 'chartreuse', 'chocolate', 'coral', 'cornflowerblue', 'cornsilk', 'crimson', 'cyan',
+                 'darkblue', 'darkcyan', 'darkgoldenrod', 'darkgray', 'darkgreen', 'darkkhaki', 'darkmagenta',
+                 'darkolivegreen', 'darkorange', 'darkorchid', 'darkred', 'darksalmon', 'darkseagreen', 'darkslateblue',
+                 'darkslategray', 'darkturquoise', 'darkviolet', 'deepskyblue', 'dimgray', 'dodgerblue', 'firebrick',
+                 'floralwhite', 'forestgreen', 'fuchsia', 'gainsboro', 'ghostwhite', 'gold', 'goldenrod', 'gray',
+                 'green', 'greenyellow', 'honeydew', 'hotpink', 'indianred', 'indigo', 'ivory', 'khaki', 'lavender',
+                 'lavenderblush', 'lawngreen', 'lemonchiffon', 'lightblue', 'lightcoral', 'lightcyan',
+                 'lightgoldenrodyellow''lightgreen', 'lightgray', 'lightpink', 'lightsalmon', 'lightseagreen',
+                 'lightskyblue', 'lightslategray', 'lightsteelblue', 'lightyellow', 'lime', 'limegreen', 'linen',
+                 'magenta', 'maroon', 'mediumaquamarine', 'mediumblue', 'mediumorchid', 'mediumpurple',
+                 'mediumseagreen', 'mediumslateblue', 'mediumspringgreen', 'mediumturquoise', 'mediumvioletred',
+                 'midnightblue', 'mintcream', 'mistyrose', 'moccasin', 'navajowhite', 'navy', 'oldlace', 'olive',
+                 'olivedrab', 'orange', 'orangered', 'orchid', 'palegoldenrod', 'paleturquoise', 'palevioletred',
+                 'papayawhip', 'peachpuff', 'peru', 'pink', 'plum', 'powderblue', 'purple', 'red', 'rosybrown',
+                 'royalblue', 'saddlebrown', 'salmon', 'sandybrown', 'seagreen', 'seashell', 'sienna', 'silver',
+                 'skyblue', 'slateblue', 'slategray', 'snow', 'springgreen', 'steelblue', 'tan', 'teal', 'thistle',
+                 'tomato', 'turquoise', 'wheat', 'white', 'whitesmoke', 'yellowgreen']
+
+
+def main(t, n, iter):
+    global thresh
+    global branch
+    global nclus
+
+    clustering = GaussianMixture(n_components=n, tol=t, max_iter=iter).fit(X)
+
+    labels = clustering.predict(X)
+
+    label_count = collections.OrderedDict(sorted(Counter(labels).items()))
+
+    col_count = len(label_count.keys())
+
+    c = 0
+
+    num = 100 / len(labels)
+
+    u = []
+
+    colour = []
+
+    percentage = []
+
+    for key, value in label_count.items():
+        label_count[key] = [value, predef_colors[c], c]
+        u.append(mpatches.Patch(color=predef_colors[c], label=str(round(value * num, 2))))
+        colour.append(predef_colors[c])
+        percentage.append(value * num)
+        c += 1
+
+    ans = [[] for i in range(0, c)]
+
+    for p, i in enumerate(labels):
+        ans[label_count[i][2]] = ans[label_count[i][2]] + [str(p + 1)]
+
+    splot = plt.subplot(111, aspect='equal')
+
+    ind = [",".join(ans[i]) for i in range(0, c)]
+
+    th = [t for i in range(0, c)]
+
+    iters = [iter for i in range(0, c)]
+
+    no_clus = [n for i in range(0, c)]
+
+    raw_data = {'Colour': colour, 'Iterations': iters, 'Cluster': no_clus, 'Percentage': percentage, 'Indexes': ind,
+                'Threshold': th}
+    d = pd.DataFrame(raw_data, columns=['Threshold', 'Iterations', 'Cluster', 'Colour', 'Percentage', 'Indexes'])
+    d.to_csv(csv_file, mode='a', header=True, index=None)
+
+    print("Threshold = " + str(t) + " Cluster = " + str(col_count) + " Iterations = " + str(iter))
+    if nclus < col_count:
+        thresh = t
+        nclus = n
+
+    col = []
+    for i in labels:
+        col.append(label_count[i][1])
+
+    x_axis = X['one']
+    y_axis = X['two']
+    for i, (mean, covar, cl) in enumerate(zip(clustering.means_, clustering.covariances_, colour)):
+        v, w = linalg.eigh(covar)
+        v = 2. * np.sqrt(2.) * np.sqrt(v)
+        y = w[0] / linalg.norm(w[0])
+        angle = np.arctan(y[1] / y[0])
+        angle = 180. * angle / np.pi
+        ell = mpl.patches.Ellipse(mean, v[0], v[1], 180 + angle, color=cl)
+        ell.set_clip_box(splot.bbox)
+        ell.set_alpha(0.3)
+        splot.add_artist(ell)
+
+    plt.scatter(x_axis, y_axis, c=col)
+    plt.axis([0, max_col[0] + 20, 0, max_col[1] + 20])
+    plt.title("t = " + str(t) + " " + "n= " + str(n) + " iter = " + str(iter))
+    plt.legend(handles=u, loc="best")
+    plt.savefig("Graph_GMM\\t=" + str(t) + " " + "n= " + str(n) + " iter = " + str(iter) + ".png")
+    plt.close()
+
+
+threshold = np.arange(0.001, 0.011, 0.001)
+n_clusters = [3, 4, 5, 6, 7, 8, 9, 10]
+iterations = range(1, 101)
+
+for i in threshold:
+    for k in n_clusters:
+        for j in iterations:
+            main(i, k, j)
+
+print("------------------------------------------------------------------")
+print("Final")
+print("Threshold = " + str(thresh) + " n_clusters= " + str(nclus) + " Iterations = " + str(iter))
